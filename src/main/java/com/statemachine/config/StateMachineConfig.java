@@ -34,7 +34,6 @@ public class StateMachineConfig
         states
                 .withStates()
                 .initial(StateEnum.SI)
-                .end(StateEnum.SE)
                 .states(EnumSet.allOf(StateEnum.class));
     }
 
