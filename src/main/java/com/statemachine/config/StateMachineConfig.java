@@ -1,27 +1,30 @@
 package com.statemachine.config;
 
-import com.statemachine.enums.EventEnum;
-import com.statemachine.enums.StateEnum;
+import com.statemachine.enums.OrderEvents;
+import com.statemachine.enums.OrderStates;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
+import org.springframework.statemachine.guard.Guard;
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.EnumSet;
 
 @Configuration
 @EnableStateMachine
-public class StateMachineConfig
-        extends EnumStateMachineConfigurerAdapter<StateEnum, EventEnum> {
+public class StateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderStates, OrderEvents> {
 
     @Override
-    public void configure(StateMachineConfigurationConfigurer<StateEnum, EventEnum> config)
+    public void configure(StateMachineConfigurationConfigurer<OrderStates, OrderEvents> config)
             throws Exception {
         config
                 .withConfiguration()
@@ -30,30 +33,67 @@ public class StateMachineConfig
     }
 
     @Override
-    public void configure(StateMachineStateConfigurer<StateEnum, EventEnum> states) throws Exception {
+    public void configure(StateMachineStateConfigurer<OrderStates, OrderEvents> states) throws Exception {
         states
                 .withStates()
-                .initial(StateEnum.SI)
-                .end(StateEnum.SE)
-                .states(EnumSet.allOf(StateEnum.class));
+                .initial(OrderStates.CREATED)
+                .state(OrderStates.CREATED)
+                .state(OrderStates.APPROVED)
+                .state(OrderStates.CANCELLED)
+                .state(OrderStates.INVOICED)
+                .state(OrderStates.SHIPPED, sendShippedProductEmail(), null)
+                .state(OrderStates.DELIVERED);
     }
 
     @Override
-    public void configure(StateMachineTransitionConfigurer<StateEnum, EventEnum> transitions) throws Exception {
+    public void configure(StateMachineTransitionConfigurer<OrderStates, OrderEvents> transitions) throws Exception {
         transitions
                 .withExternal()
-                .source(StateEnum.SI).target(StateEnum.S1).event(EventEnum.E1)
-                .and()
-                .withExternal()
-                .source(StateEnum.S1).target(StateEnum.S2).event(EventEnum.E2);
+                .source(OrderStates.CREATED).target(OrderStates.APPROVED)
+                .event(OrderEvents.CONFIRMED_PAYMENT)
+
+                .and().withExternal()
+                .source(OrderStates.APPROVED).target(OrderStates.INVOICED)
+                .event(OrderEvents.INVOICE_ISSUED)
+                .guard(onlyWorkingDays())
+
+                .and().withExternal()
+                .source(OrderStates.APPROVED).target(OrderStates.CANCELLED)
+                .event(OrderEvents.CANCEL)
+
+                .and().withExternal()
+                .source(OrderStates.INVOICED).target(OrderStates.SHIPPED)
+                .event(OrderEvents.SHIP)
+
+                .and().withExternal()
+                .source(OrderStates.SHIPPED).target(OrderStates.DELIVERED)
+                .event(OrderEvents.DELIVER)
+        ;
     }
 
     @Bean
-    public StateMachineListener<StateEnum, EventEnum> listener() {
+    public Action<OrderStates, OrderEvents> sendShippedProductEmail() {
+        return context -> System.out.println("Product has been shipped, sending e-mail to inform the user");
+    }
+
+    @Bean
+    public Guard<OrderStates, OrderEvents> onlyWorkingDays() {
+        return context -> !LocalDate.now().getDayOfWeek().equals(DayOfWeek.SATURDAY) &&
+                !LocalDate.now().getDayOfWeek().equals(DayOfWeek.SUNDAY);
+    }
+
+    @Bean
+    public StateMachineListener<OrderStates, OrderEvents> listener() {
         return new StateMachineListenerAdapter<>() {
             @Override
-            public void stateChanged(State<StateEnum, EventEnum> from, State<StateEnum, EventEnum> to) {
-                System.out.println("State change to " + to.getId());
+            public void stateChanged(State<OrderStates, OrderEvents> from, State<OrderStates, OrderEvents> to) {
+
+                if (from == null) {
+                    System.out.println("OrderState has been started to " + to.getId());
+                } else {
+                    System.out.println("OrderState changed from " + from.getId() + " to " + to.getId());
+                }
+
             }
         };
     }

@@ -1,5 +1,8 @@
 # Spring - State Machine
 
+## Article 1 - Medium:
+https://medium.com/nstech/spring-state-machine-como-opção-97144586bf48
+![img.png](img.png)
 ## Overview
 
 This repository serves as a learning resource for understanding and implementing Spring State Machine within a Spring Boot application. The primary goal is to provide a practical guide on leveraging the Spring State Machine library to build stateful applications and integrate them seamlessly into Spring Boot projects and APIs.
